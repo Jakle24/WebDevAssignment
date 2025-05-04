@@ -4,3 +4,4 @@ uvicorn
 pyjwt
 passlib[bcrypt]
 bcrypt==3.2.0
+mysql-connector-python>=8.0
