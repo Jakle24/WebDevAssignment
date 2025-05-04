@@ -7,7 +7,7 @@ app = FastAPI()
 # Pydantic model to define the schema of the data for PUT POST DELETE
 class Products(BaseModel):
     ProductID: int
-Name: str
+    Name: str
 @app.get("/")
 def root():
     return {"message": "Introducing my coursework"}
