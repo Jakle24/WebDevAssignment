@@ -3,7 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 from typing import List, Optional
 import mysql.connector
-from auth import AuthHandler
+from auth import AuthHandler, hash_password
 from schemas import AuthDetails
 
 app = FastAPI()
@@ -49,6 +49,21 @@ class UpdateAddress(BaseModel):
     address_id: int
     address: str
     district: str
+
+class CustomerCreate(BaseModel):
+    store_id: int
+    first_name: str
+    last_name: str
+    email: str
+    address_id: int
+    active: int
+    password: str
+
+class CustomerOut(BaseModel):
+    customer_id: int
+    first_name: str
+    last_name: str
+    email: str
 
 # --- Token Endpoints ---
 @app.post("/token", tags=["Token"])
@@ -124,23 +139,38 @@ def get_active_customers(store_id: int):
         raise HTTPException(status_code=404, detail="No active customers found for this store")
     return results
 
+@app.get("/customers/{customer_id}", response_model=CustomerOut)
+def get_customer(customer_id: int):
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT customer_id, first_name, last_name, email FROM customer WHERE customer_id=%s",
+        (customer_id,)
+    )
+    result = cursor.fetchone()
+    cursor.close()
+    if not result:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return result
+
 # --- POST Endpoints (Protected) ---
 @app.post("/customers/new", status_code=201)
 def create_customer(
-    customer: NewCustomer,
+    customer: CustomerCreate,
     username: str = Depends(jwt_required)
 ):
+    hashed_pw = hash_password(customer.password)
     db = get_db()
     cursor = db.cursor()
     try:
         cursor.execute(
             """
-            INSERT INTO customer (store_id, first_name, last_name, email, address_id, active, create_date)
-            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            INSERT INTO customer (store_id, first_name, last_name, email, address_id, active, password, create_date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
             """,
             (
                 customer.store_id, customer.first_name, customer.last_name,
-                customer.email, customer.address_id, customer.active
+                customer.email, customer.address_id, customer.active, hashed_pw
             )
         )
         db.commit()
